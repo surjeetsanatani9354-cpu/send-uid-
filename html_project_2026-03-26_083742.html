@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Pro - Account Management</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --premium-gold: #fbbf24;
+            --bg-dark: #020617;
+            --card-bg: #1e293b;
+            --danger: #ef4444;
+        }
+
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: var(--bg-dark); 
+            color: white; 
+            margin: 0; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; 
+        }
+
+        .main-content { 
+            width: 100%; 
+            max-width: 500px; 
+            padding: 20px; 
+        }
+
+        .card { 
+            background: var(--card-bg); 
+            padding: 30px; 
+            border-radius: 20px; 
+            border: 1px solid #334155; 
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+
+        h2 { 
+            color: var(--premium-gold); 
+            margin-top: 0; 
+            display: flex; 
+            align-items: center; 
+            gap: 10px;
+        }
+
+        label { 
+            display: block; 
+            margin-bottom: 8px; 
+            font-size: 13px; 
+            color: #94a3b8; 
+            margin-top: 15px; 
+        }
+
+        input { 
+            width: 100%; 
+            padding: 12px; 
+            border-radius: 8px; 
+            border: 1px solid #475569; 
+            background: #0f172a; 
+            color: white; 
+            box-sizing: border-box; 
+            outline: none;
+        }
+        
+        input:focus { border-color: var(--premium-gold); }
+
+        .btn { 
+            background: var(--premium-gold); 
+            color: #000; 
+            font-weight: 800; 
+            border: none; 
+            padding: 15px; 
+            border-radius: 10px; 
+            width: 100%; 
+            cursor: pointer; 
+            text-transform: uppercase; 
+            margin-top: 25px; 
+            transition: 0.2s;
+        }
+
+        .btn:hover { opacity: 0.9; transform: translateY(-1px); }
+
+        /* Logout Button Style */
+        .btn-logout-all {
+            background: transparent;
+            color: var(--danger);
+            border: 2px solid var(--danger);
+            margin-top: 15px;
+        }
+
+        .btn-logout-all:hover {
+            background: var(--danger);
+            color: white;
+        }
+
+        .readonly-box { 
+            background: #020617 !important; 
+            border-color: #334155 !important; 
+            color: var(--premium-gold) !important; 
+            cursor: not-allowed; 
+        }
+
+        hr { border: 0; border-top: 1px solid #334155; margin: 25px 0; }
+        
+        .info-text {
+            font-size: 11px;
+            color: #64748b;
+            text-align: center;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-content">
+        <div class="card">
+            <h2><i class="fas fa-user-cog"></i> Admin Account</h2>
+            
+            <label>Current Username</label>
+            <input type="text" id="curUser" class="readonly-box" readonly>
+            
+            <label>Current Password</label>
+            <input type="text" id="curPass" class="readonly-box" readonly>
+
+            <hr>
+
+            <label>New Admin Username</label>
+            <input type="text" id="newAdminUser" placeholder="Enter new username">
+            
+            <label>New Admin Password</label>
+            <input type="text" id="newAdminPass" placeholder="Enter new password">
+            
+            <button class="btn" onclick="updateAdminCredentials()">UPDATE ADMIN LOGIN</button>
+
+            <hr>
+
+            <button class="btn btn-logout-all" onclick="logoutAllAdmins()">
+                <i class="fas fa-sign-out-alt"></i> Logout All Admin Devices
+            </button>
+            <p class="info-text">Sabhi mobile/PC se admin panel logout ho jayega.</p>
+        </div>
+    </div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, set, update, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyDnM9ry5JreqjRXqQVUSiaBzudXuaAF-QI",
+        databaseURL: "https://send-message-b178e-default-rtdb.asia-southeast1.firebasedatabase.app",
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // Current Login Time for this device
+    const myLoginTime = Date.now();
+
+    // 1. Listen for Global Admin Logout Trigger
+    onValue(ref(db, 'adminSettings/adminLogoutTrigger'), (snap) => {
+        const lastTrigger = snap.val() || 0;
+        // Agar trigger mere login karne ke BAAD dabaya gaya hai, toh logout karo
+        if (localStorage.getItem('adminLoggedIn') === 'true' && lastTrigger > myLoginTime) {
+            localStorage.removeItem('adminLoggedIn');
+            alert("Security Alert: All admin sessions have been terminated.");
+            location.reload();
+        }
+    });
+
+    // 2. Fetch Current Admin Data
+    onValue(ref(db, 'adminSettings'), (snap) => {
+        const d = snap.val() || { user: "ADMIN", pass: "PASS" };
+        document.getElementById('curUser').value = d.user || "ADMIN";
+        document.getElementById('curPass').value = d.pass || "PASS";
+    });
+
+    // 3. Update Admin Credentials
+    window.updateAdminCredentials = function() {
+        const newUser = document.getElementById('newAdminUser').value.trim();
+        const newPass = document.getElementById('newAdminPass').value.trim();
+        
+        if(!newUser || !newPass) {
+            return alert("Please fill in both new username and password fields!");
+        }
+        
+        update(ref(db, 'adminSettings'), { 
+            user: newUser, 
+            pass: newPass 
+        })
+        .then(() => {
+            alert("Admin Account Updated Successfully! ✅");
+            document.getElementById('newAdminUser').value = "";
+            document.getElementById('newAdminPass').value = "";
+        })
+        .catch((error) => {
+            alert("Error updating: " + error.message);
+        });
+    };
+
+    // 4. Logout All Admins Logic
+    window.logoutAllAdmins = function() {
+        if (confirm("⚠️ Kya aap sach mein sabhi devices se admin panel logout karna chahte hain?")) {
+            update(ref(db, 'adminSettings'), {
+                adminLogoutTrigger: Date.now()
+            }).then(() => {
+                alert("All Admin sessions terminated! ✅");
+                // Local device ko bhi clear karo
+                localStorage.removeItem('adminLoggedIn');
+                location.reload();
+            });
+        }
+    };
+</script>
+</body>
+</html>
